@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forest Fire Prediction Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+
+        .card {
+            margin-bottom: 20px;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+
+        .weather-summary {
+            font-size: 1.2rem;
+        }
+
+        .risk-high {
+            color: red;
+        }
+
+        .risk-low {
+            color: green;
+        }
+
+        input, button {
+            margin: 10px 0;
+        }
+
+        input {
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #444;
+        }
+
+        button {
+            background-color: #444;
+            color: white;
+        }
+
+        h1, h3, h4 {
+            color: #e0e0e0;
+        }
+
+        canvas {
+            background-color: #202020;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Dashboard Header with Input -->
+        <div class="text-center mt-4 mb-4">
+            <h1>Forest Fire Prediction Dashboard</h1>
+            <h4 class="text-muted">Enter a place to get real-time weather and fire risk predictions</h4>
+
+            <!-- Input field and button -->
+            <input type="text" id="place-input" class="form-control" placeholder="Enter a place name">
+            <button id="fetch-weather-btn" class="btn btn-primary">Get Forecast</button>
+        </div>
+
+        <!-- Weather Summary Section -->
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card p-3">
+                    <h3 class="card-title">Current Weather</h3>
+                    <p class="weather-summary">Temperature: <span id="current-temperature">--</span>°C</p>
+                    <p class="weather-summary">Humidity: <span id="current-humidity">--</span>%</p>
+                    <p class="weather-summary">Wind: <span id="current-wind-speed">--</span> km/h</p>
+                    <p class="weather-summary">Condition: <span id="current-condition">--</span></p>
+                </div>
+            </div>
+            <!-- Risk Prediction Section -->
+            <div class="col-md-4">
+                <div class="card p-3">
+                    <h3 class="card-title">Fire Risk Level</h3>
+                    <p class="weather-summary" id="fire-risk">Calculating...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="card p-3">
+            <h3>Temperature & Humidity Forecast</h3>
+            <canvas id="weatherChart"></canvas>
+        </div>
+
+        <!-- Weather Data Table -->
+        <div class="card p-3">
+            <h3>Detailed Weather Forecast</h3>
+            <table class="table table-striped table-dark">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Temperature (°C)</th>
+                        <th>Humidity (%)</th>
+                        <th>Wind Speed (km/h)</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody id="weatherTableBody">
+                    <!-- Data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Fetch weather data from the API for the user input city
+        async function fetchWeatherData(city) {
+            try {
+                const response = await fetch(`http://localhost:8000/forecast/${city}`);
+                const data = await response.json(); // Assuming the API returns JSON
+                return data;
+            } catch (error) {
+                console.error('Error fetching weather data:', error);
+                return null;
+            }
+        }
+
+        // Update the place name dynamically
+        function updatePlaceName(name) {
+            document.getElementById('place-name').textContent = name;
+        }
+
+        // Insert current weather data into the summary
+        function updateCurrentWeather(weatherData) {
+            const currentWeather = weatherData[0]; // Use the latest weather data
+            document.getElementById('current-temperature').textContent = currentWeather.temperature;
+            document.getElementById('current-humidity').textContent = currentWeather.humidity;
+            document.getElementById('current-wind-speed').textContent = currentWeather.wind_speed;
+            document.getElementById('current-condition').textContent = currentWeather.description;
+        }
+
+        // Calculate fire risk based on temperature and humidity
+        function calculateFireRisk(weatherData) {
+            const temp = weatherData[0].temperature;
+            const humidity = weatherData[0].humidity;
+
+            let riskLevel = '';
+            if (temp > 35 && humidity < 10) {
+                riskLevel = '<span class="risk-high">High Risk</span>';
+            } else if (temp > 30 && humidity < 20) {
+                riskLevel = '<span class="risk-high">Medium Risk</span>';
+            } else {
+                riskLevel = '<span class="risk-low">Low Risk</span>';
+            }
+            document.getElementById('fire-risk').innerHTML = riskLevel;
+        }
+
+        // Display weather data in the table
+        function populateWeatherTable(weatherData) {
+            const tableBody = document.getElementById('weatherTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            weatherData.forEach((data) => {
+                const row = `<tr>
+                    <td>${data.date}</td>
+                    <td>${data.temperature}</td>
+                    <td>${data.humidity}</td>
+                    <td>${data.wind_speed}</td>
+                    <td>${data.description}</td>
+                </tr>`;
+                tableBody.innerHTML += row;
+            });
+        }
+
+        // Generate the weather chart
+        function generateWeatherChart(weatherData) {
+            const ctx = document.getElementById('weatherChart').getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: weatherData.map(d => d.date),
+                    datasets: [
+                        {
+                            label: 'Temperature (°C)',
+                            data: weatherData.map(d => d.temperature),
+                            borderColor: 'rgb(255, 99, 132)',
+                            yAxisID: 'temp-axis',
+                        },
+                        {
+                            label: 'Humidity (%)',
+                            data: weatherData.map(d => d.humidity),
+                            borderColor: 'rgb(54, 162, 235)',
+                            yAxisID: 'humidity-axis',
+                        },
+                    ]
+                },
+                options: {
+                    scales: {
+                        'temp-axis': {
+                            type: 'linear',
+                            position: 'left',
+                        },
+                        'humidity-axis': {
+                            type: 'linear',
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize the dashboard with user input
+        async function initDashboard(city) {
+            const weatherData = await fetchWeatherData(city);
+            if (weatherData) {
+                updateCurrentWeather(weatherData);
+                calculateFireRisk(weatherData);
+                populateWeatherTable(weatherData);
+                generateWeatherChart(weatherData);
+            }
+        }
+
+        // Event listener for the button to fetch weather data
+        document.getElementById('fetch-weather-btn').addEventListener('click', () => {
+            const city = document.getElementById('place-input').value;
+            if (city) {
+                initDashboard(city);
+            } else {
+                alert('Please enter a place name');
+            }
+        });
+    </script>
+</body>
+
+</html>
